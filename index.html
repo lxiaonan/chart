@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>模型实验台 | GitHub Pages</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="control-panel" aria-label="模型配置">
+        <header class="brand-block">
+          <p class="eyebrow">Static Model Lab</p>
+          <h1>模型实验台</h1>
+          <p>部署在 GitHub Pages 的纯前端版本，直接连接 OpenAI 兼容模型网关。</p>
+        </header>
+
+        <section class="panel-block" aria-labelledby="connectionTitle">
+          <div class="section-head">
+            <div>
+              <span class="section-index">01</span>
+              <h2 id="connectionTitle">连接</h2>
+            </div>
+            <button id="saveConfig" class="icon-button text-button" type="button" title="保存到本机">
+              保存
+            </button>
+          </div>
+
+          <label class="field">
+            <span>Base URL</span>
+            <input id="baseUrl" type="url" autocomplete="off" spellcheck="false" />
+          </label>
+
+          <label class="field">
+            <span>API Key</span>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
+          </label>
+
+          <div class="inline-actions">
+            <button id="fetchModels" class="primary-button" type="button">获取模型</button>
+            <button id="clearConfig" class="ghost-button" type="button">清除</button>
+          </div>
+          <p id="connectionStatus" class="status-text">填写 Key 后获取模型。</p>
+        </section>
+
+        <section class="panel-block model-block" aria-labelledby="modelTitle">
+          <div class="section-head">
+            <div>
+              <span class="section-index">02</span>
+              <h2 id="modelTitle">模型</h2>
+            </div>
+            <span id="modelCount" class="count-pill">0</span>
+          </div>
+
+          <label class="field">
+            <span>手动模型名</span>
+            <input id="manualModel" type="text" autocomplete="off" spellcheck="false" placeholder="例如 gpt-4o-mini" />
+          </label>
+
+          <div id="modelList" class="model-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-block" aria-labelledby="optionsTitle">
+          <div class="section-head">
+            <div>
+              <span class="section-index">03</span>
+              <h2 id="optionsTitle">参数</h2>
+            </div>
+          </div>
+
+          <label class="range-field">
+            <span>Temperature <strong id="temperatureValue">0.7</strong></span>
+            <input id="temperature" type="range" min="0" max="2" step="0.1" value="0.7" />
+          </label>
+
+          <label class="field">
+            <span>System Prompt</span>
+            <textarea id="systemPrompt" rows="4" placeholder="可选：给模型一段固定角色或约束"></textarea>
+          </label>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-topbar">
+          <div class="active-model">
+            <span>当前模型</span>
+            <strong id="activeModel">尚未选择</strong>
+          </div>
+          <div class="topbar-actions">
+            <button id="exportChat" class="ghost-button" type="button">导出</button>
+            <button id="clearChat" class="ghost-button" type="button">清空</button>
+          </div>
+        </header>
+
+        <section id="messages" class="messages" aria-live="polite"></section>
+
+        <form id="composer" class="composer">
+          <label class="sr-only" for="prompt">继续对话</label>
+          <textarea id="prompt" rows="4" placeholder="输入消息，按 Ctrl + Enter 发送。页面会携带上文继续对话。"></textarea>
+          <div class="composer-footer">
+            <p id="chatStatus" class="status-text">准备就绪。</p>
+            <div class="composer-actions">
+              <button id="stop" class="ghost-button stop-button" type="button" disabled>停止</button>
+              <button id="send" class="primary-button" type="submit" disabled>发送</button>
+            </div>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <div class="message-meta">
+          <span class="message-role"></span>
+          <button class="copy-button" type="button">复制</button>
+        </div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
