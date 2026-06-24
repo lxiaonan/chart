@@ -84,26 +84,32 @@
             <textarea id="systemPrompt" rows="4" placeholder="可选：给模型一段固定角色或约束"></textarea>
           </label>
         </section>
+
+        <section class="panel-block panel-actions" aria-label="聊天管理">
+          <div class="inline-actions">
+            <button id="exportChat" class="ghost-button" type="button">导出聊天</button>
+            <button id="clearChat" class="ghost-button" type="button">清空聊天</button>
+          </div>
+        </section>
       </aside>
 
       <main class="workspace">
         <header class="workspace-topbar">
-          <div class="active-model">
-            <span>当前模型</span>
-            <strong id="activeModel">尚未选择</strong>
+          <button class="chat-nav-button" type="button" aria-label="返回">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <div class="chat-title">
+            <strong>沈幼楚</strong>
+            <span id="activeModel">尚未选择</span>
           </div>
-          <div class="topbar-actions">
-            <button id="connectionSettings" class="ghost-button" type="button">连接</button>
-            <button id="exportChat" class="ghost-button" type="button">导出</button>
-            <button id="clearChat" class="ghost-button" type="button">清空</button>
-          </div>
+          <button id="connectionSettings" class="chat-more-button" type="button" aria-label="返回模型选择">•••</button>
         </header>
 
         <section id="messages" class="messages" aria-live="polite"></section>
 
         <form id="composer" class="composer">
           <label class="sr-only" for="prompt">继续对话</label>
-          <textarea id="prompt" rows="4" placeholder="输入消息，按 Ctrl + Enter 发送。页面会携带上文继续对话。"></textarea>
+          <textarea id="prompt" rows="1" placeholder=""></textarea>
           <div class="composer-footer">
             <p id="chatStatus" class="status-text">准备就绪。</p>
             <div class="composer-actions">
@@ -117,6 +123,7 @@
 
     <template id="messageTemplate">
       <article class="message">
+        <div class="message-avatar" aria-hidden="true"></div>
         <div class="message-meta">
           <span class="message-role"></span>
           <button class="copy-button" type="button">复制</button>

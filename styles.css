@@ -189,7 +189,6 @@ h2 {
 .workspace-topbar,
 .composer-footer,
 .inline-actions,
-.topbar-actions,
 .composer-actions,
 .message-meta {
   display: flex;
@@ -377,20 +376,47 @@ input[type="range"] {
   box-shadow: var(--shadow);
 }
 
-.active-model {
+.chat-title {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
+  text-align: center;
 }
 
-.active-model span {
+.chat-title strong {
+  font-size: 18px;
+}
+
+.chat-title span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
-.active-model strong {
-  overflow-wrap: anywhere;
+.chat-nav-button,
+.chat-more-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.chat-nav-button span {
+  display: block;
+  transform: translateY(-1px);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.chat-more-button {
+  font-size: 18px;
+  letter-spacing: 0;
 }
 
 .messages {
@@ -425,12 +451,17 @@ input[type="range"] {
 }
 
 .message {
+  position: relative;
   max-width: 880px;
   margin: 0 0 16px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(27, 30, 24, 0.72);
+}
+
+.message-avatar {
+  display: none;
 }
 
 .message[data-role="user"] {
@@ -583,58 +614,219 @@ input[type="range"] {
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100dvh;
     min-height: 0;
-    padding: 10px;
+    padding: 0;
     overflow: hidden;
+    background: #ededed;
   }
 
   .workspace-topbar {
-    min-height: 0;
-    margin-bottom: 10px;
-    padding: 10px 12px;
+    min-height: 54px;
+    margin-bottom: 0;
+    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+    border: 0;
+    border-radius: 0;
+    background: #f7f7f7;
+    color: #181818;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
     align-items: center;
     flex-direction: row;
   }
 
+  .chat-title {
+    flex: 1;
+    gap: 2px;
+  }
+
+  .chat-title strong {
+    color: #171717;
+    font-size: 17px;
+    font-weight: 650;
+  }
+
+  .chat-title span {
+    color: #8a8a8a;
+    font-size: 10px;
+  }
+
+  .chat-nav-button,
+  .chat-more-button {
+    width: 38px;
+    height: 38px;
+    background: transparent;
+    color: #202020;
+  }
+
+  .chat-nav-button {
+    visibility: hidden;
+  }
+
   .messages {
-    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 12px;
+    border: 0;
+    border-radius: 0;
+    background: #ededed;
   }
 
   .message {
-    margin-bottom: 10px;
-    padding: 12px;
+    display: grid;
+    grid-template-columns: 36px minmax(0, auto);
+    column-gap: 8px;
+    width: fit-content;
+    max-width: min(82vw, 680px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .message[data-role="user"] {
+    align-self: flex-end;
+    grid-template-columns: minmax(0, auto);
+    max-width: min(78vw, 680px);
+    margin-left: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .message-avatar {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 46%),
+      linear-gradient(145deg, #f4d37c, #b8892d);
+  }
+
+  .message[data-role="user"] .message-avatar {
+    display: none;
+  }
+
+  .message-meta {
+    display: none;
+  }
+
+  .message-body {
+    grid-column: 2;
+    position: relative;
+    min-height: 36px;
+    margin-top: 0;
+    padding: 9px 12px;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #151515;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  }
+
+  .message-body::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    background: #ffffff;
+    transform: rotate(45deg);
+  }
+
+  .message[data-role="user"] .message-body {
+    grid-column: 1;
+    background: #95ec69;
+  }
+
+  .message[data-role="user"] .message-body::before {
+    left: auto;
+    right: -5px;
+    background: #95ec69;
+  }
+
+  .empty-state {
+    color: #6f6f6f;
+  }
+
+  .empty-state h2 {
+    color: #202020;
+    font-size: 28px;
+  }
+
+  .message-body pre {
+    border-color: #d8d8d8;
+    background: rgba(0, 0, 0, 0.05);
+    color: #151515;
   }
 
   .composer {
-    margin-top: 10px;
-    padding: 10px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+    margin-top: 0;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+    background: #f7f7f7;
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
   }
 
   .composer textarea {
-    min-height: 76px;
-    max-height: 128px;
+    min-height: 36px;
+    max-height: 96px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #151515;
+    line-height: 1.4;
   }
 
   .composer-footer {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 8px;
+    display: contents;
   }
 
-  .topbar-actions,
   .composer-actions {
-    width: 100%;
+    display: contents;
   }
 
-  .topbar-actions button,
-  .composer-actions button {
-    flex: 1;
+  .composer .status-text {
+    display: none;
+  }
+
+  .composer-actions .primary-button,
+  .composer-actions .stop-button {
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  .composer-actions .primary-button {
+    background: #07c160;
+    color: #ffffff;
+  }
+
+  .composer-actions .stop-button {
+    grid-column: 3 / span 2;
+    width: 100%;
+    background: #ffffff;
+    color: #d04b34;
+  }
+
+  .composer-actions .stop-button:disabled {
+    display: none;
   }
 }
 
 @media (max-width: 420px) {
   .workspace-topbar {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 }
