@@ -38,6 +38,9 @@ const state = {
   controller: null,
 };
 
+const RETRY_ATTEMPTS_PER_MODEL = 5;
+const FALLBACK_MODEL_LIMIT = 3;
+
 function normalizeBaseUrl(value) {
   const text = String(value || '').trim();
   if (!text) {
@@ -294,6 +297,143 @@ function extractStreamDelta(payload) {
   );
 }
 
+function pickFallbackModels(currentModel) {
+  const current = String(currentModel || '').trim();
+  const candidates = state.models
+    .map(model => String(model?.id || '').trim())
+    .filter(modelId => modelId && modelId !== current);
+
+  const shuffled = [...new Set(candidates)];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled.slice(0, FALLBACK_MODEL_LIMIT);
+}
+
+async function requestAssistantReply({ model, requestHistory, assistantIndex, signal }) {
+  const response = await fetch(buildUrl('/v1/chat/completions'), {
+    method: 'POST',
+    headers: authHeaders(),
+    signal,
+    body: JSON.stringify({
+      model,
+      messages: buildRequestMessages(requestHistory),
+      temperature: Number(ui.temperature.value),
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error?.message || payload?.error || `请求失败：HTTP ${response.status}`);
+  }
+
+  if (!response.body) {
+    const payload = await response.json().catch(() => null);
+    const reply = extractAssistantText(payload);
+    if (!reply.trim()) {
+      throw new Error('模型没有返回有效内容。');
+    }
+    state.messages[assistantIndex].content = reply;
+    renderMessages();
+    return reply;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let reply = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() || '';
+
+    for (const block of blocks) {
+      for (const line of block.split(/\r?\n/)) {
+        if (!line.startsWith('data:')) {
+          continue;
+        }
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') {
+          continue;
+        }
+        const payload = JSON.parse(data);
+        const delta = extractStreamDelta(payload);
+        if (delta) {
+          reply += delta;
+          state.messages[assistantIndex].content = reply;
+          renderMessages();
+          setStatus(ui.chatStatus, '正在流式输出...', 'busy');
+        }
+      }
+    }
+  }
+
+  if (!reply.trim()) {
+    throw new Error('模型没有返回有效内容。');
+  }
+
+  return reply;
+}
+
+async function requestWithRetries({ requestHistory, assistantIndex, signal }) {
+  const primaryModel = getCurrentModel();
+  const modelsToTry = [primaryModel, ...pickFallbackModels(primaryModel)];
+  let lastError = null;
+
+  for (const [modelIndex, model] of modelsToTry.entries()) {
+    for (let attempt = 1; attempt <= RETRY_ATTEMPTS_PER_MODEL; attempt += 1) {
+      if (signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+
+      state.messages[assistantIndex].content = '';
+      renderMessages();
+      const switchingText = modelIndex === 0 ? '' : `，已切换到 ${model}`;
+      setStatus(
+        ui.chatStatus,
+        `正在请求模型${switchingText}（第 ${attempt}/${RETRY_ATTEMPTS_PER_MODEL} 次）...`,
+        'busy',
+      );
+
+      try {
+        const reply = await requestAssistantReply({
+          model,
+          requestHistory,
+          assistantIndex,
+          signal,
+        });
+        if (model !== primaryModel) {
+          state.selectedModel = model;
+          ui.manualModel.value = '';
+          renderActiveModel();
+        }
+        return { reply, model, attempts: attempt, switched: model !== primaryModel };
+      } catch (error) {
+        lastError = error;
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw error;
+        }
+      }
+    }
+  }
+
+  const modelCount = modelsToTry.length;
+  throw new Error(
+    `连续尝试 ${modelCount} 个模型、每个 ${RETRY_ATTEMPTS_PER_MODEL} 次后仍未获得有效回复。最后错误：${
+      lastError instanceof Error ? lastError.message : '未知错误'
+    }`,
+  );
+}
+
 async function fetchModels() {
   setStatus(ui.connectionStatus, '正在获取模型...', 'busy');
   try {
@@ -353,70 +493,17 @@ async function sendMessage() {
   setStatus(ui.chatStatus, '正在请求模型...', 'busy');
 
   try {
-    const response = await fetch(buildUrl('/v1/chat/completions'), {
-      method: 'POST',
-      headers: authHeaders(),
+    const result = await requestWithRetries({
+      requestHistory,
+      assistantIndex,
       signal: state.controller.signal,
-      body: JSON.stringify({
-        model: getCurrentModel(),
-        messages: buildRequestMessages(requestHistory),
-        temperature: Number(ui.temperature.value),
-        stream: true,
-      }),
     });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error?.message || payload?.error || `请求失败：HTTP ${response.status}`);
-    }
-
-    if (!response.body) {
-      const payload = await response.json().catch(() => null);
-      state.messages[assistantIndex].content = extractAssistantText(payload);
-      renderMessages();
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split(/\r?\n\r?\n/);
-      buffer = blocks.pop() || '';
-
-      for (const block of blocks) {
-        for (const line of block.split(/\r?\n/)) {
-          if (!line.startsWith('data:')) {
-            continue;
-          }
-          const data = line.slice(5).trim();
-          if (!data || data === '[DONE]') {
-            continue;
-          }
-          const payload = JSON.parse(data);
-          const delta = extractStreamDelta(payload);
-          if (delta) {
-            state.messages[assistantIndex].content += delta;
-            renderMessages();
-            setStatus(ui.chatStatus, '正在流式输出...', 'busy');
-          }
-        }
-      }
-    }
-
-    if (!state.messages[assistantIndex].content.trim()) {
-      throw new Error('模型没有返回有效内容。');
-    }
-
     saveState();
-    setStatus(ui.chatStatus, '回复完成。', 'success');
+    setStatus(
+      ui.chatStatus,
+      result.switched ? `回复完成，已自动切换到 ${result.model}。` : '回复完成。',
+      'success',
+    );
   } catch (error) {
     const aborted = error instanceof DOMException && error.name === 'AbortError';
     if (!state.messages[assistantIndex].content.trim()) {
