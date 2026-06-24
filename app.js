@@ -53,7 +53,7 @@ function loadSavedState() {
     ui.apiKey.value = saved.apiKey || '';
     ui.manualModel.value = saved.manualModel || '';
     ui.systemPrompt.value = saved.systemPrompt || '';
-    ui.temperature.value = saved.temperature || '0.7';
+    ui.temperature.value = saved.temperature || '0.8';
     state.selectedModel = saved.selectedModel || saved.manualModel || '';
     state.messages = Array.isArray(saved.messages) ? saved.messages : [];
   } catch {
@@ -80,7 +80,7 @@ function clearSavedState() {
   ui.apiKey.value = '';
   ui.manualModel.value = '';
   ui.systemPrompt.value = '';
-  ui.temperature.value = '0.7';
+    ui.temperature.value = '0.8';
   state.selectedModel = '';
   state.models = [];
   renderModels();
