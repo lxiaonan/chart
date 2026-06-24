@@ -699,9 +699,7 @@ input[type="range"] {
     width: 36px;
     height: 36px;
     border-radius: 6px;
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 46%),
-      linear-gradient(145deg, #f4d37c, #b8892d);
+    background: #ddd url("./assets/shen-youchu-avatar.png") center / cover no-repeat;
   }
 
   .message[data-role="user"] .message-avatar {
