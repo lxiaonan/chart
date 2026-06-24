@@ -80,7 +80,7 @@ function clearSavedState() {
   ui.apiKey.value = '';
   ui.manualModel.value = '';
   ui.systemPrompt.value = '';
-    ui.temperature.value = '0.8';
+  ui.temperature.value = '0.8';
   state.selectedModel = '';
   state.models = [];
   renderModels();
@@ -164,7 +164,16 @@ function renderMessageBody(body, content) {
     .replace(/\n/g, '<br>');
 }
 
-function renderMessages() {
+function isMessagesNearBottom() {
+  const distanceFromBottom =
+    ui.messages.scrollHeight - ui.messages.scrollTop - ui.messages.clientHeight;
+  return distanceFromBottom < 96;
+}
+
+function renderMessages({ forceScroll = false } = {}) {
+  const shouldStickToBottom = forceScroll || isMessagesNearBottom();
+  const previousScrollTop = ui.messages.scrollTop;
+  const previousScrollHeight = ui.messages.scrollHeight;
   ui.messages.innerHTML = '';
 
   if (state.messages.length === 0) {
@@ -202,7 +211,12 @@ function renderMessages() {
     ui.messages.append(fragment);
   });
 
-  ui.messages.scrollTop = ui.messages.scrollHeight;
+  if (shouldStickToBottom) {
+    ui.messages.scrollTop = ui.messages.scrollHeight;
+  } else {
+    const heightDelta = ui.messages.scrollHeight - previousScrollHeight;
+    ui.messages.scrollTop = previousScrollTop + Math.max(0, heightDelta);
+  }
 }
 
 function updateControls() {
@@ -291,7 +305,7 @@ async function sendMessage() {
   const assistantIndex = state.messages.length - 1;
   ui.prompt.value = '';
   state.controller = new AbortController();
-  renderMessages();
+  renderMessages({ forceScroll: true });
   updateControls();
   setStatus(ui.chatStatus, '正在请求模型...', 'busy');
 
@@ -365,7 +379,7 @@ async function sendMessage() {
     if (!state.messages[assistantIndex].content.trim()) {
       state.messages.splice(assistantIndex, 1);
     }
-    renderMessages();
+    renderMessages({ forceScroll: true });
     setStatus(
       ui.chatStatus,
       aborted ? '已停止生成。' : error instanceof TypeError ? '请求失败，可能是 CORS 或网络问题。' : error.message,
