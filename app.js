@@ -2,10 +2,14 @@ const DEFAULT_BASE_URL = 'https://jiuuij.de5.net/';
 const STORAGE_KEY = 'github-pages-model-lab-v1';
 
 const ui = {
+  appShell: document.querySelector('#appShell'),
+  settingsBackdrop: document.querySelector('#settingsBackdrop'),
   baseUrl: document.querySelector('#baseUrl'),
   apiKey: document.querySelector('#apiKey'),
   saveConfig: document.querySelector('#saveConfig'),
   clearConfig: document.querySelector('#clearConfig'),
+  enterChat: document.querySelector('#enterChat'),
+  closeSettings: document.querySelector('#closeSettings'),
   fetchModels: document.querySelector('#fetchModels'),
   connectionStatus: document.querySelector('#connectionStatus'),
   manualModel: document.querySelector('#manualModel'),
@@ -21,6 +25,7 @@ const ui = {
   chatStatus: document.querySelector('#chatStatus'),
   stop: document.querySelector('#stop'),
   send: document.querySelector('#send'),
+  connectionSettings: document.querySelector('#connectionSettings'),
   clearChat: document.querySelector('#clearChat'),
   exportChat: document.querySelector('#exportChat'),
   template: document.querySelector('#messageTemplate'),
@@ -83,8 +88,12 @@ function clearSavedState() {
   ui.temperature.value = '0.8';
   state.selectedModel = '';
   state.models = [];
+  state.messages = [];
   renderModels();
+  renderMessages({ forceScroll: true });
   renderActiveModel();
+  setAppMode('connect');
+  setSettingsOpen(false);
   updateControls();
 }
 
@@ -101,6 +110,38 @@ function authHeaders() {
 
 function getCurrentModel() {
   return ui.manualModel.value.trim() || state.selectedModel;
+}
+
+function hasReadyConnection() {
+  return Boolean(normalizeBaseUrl(ui.baseUrl.value) && ui.apiKey.value.trim() && getCurrentModel());
+}
+
+function setSettingsOpen(isOpen) {
+  ui.appShell.dataset.settingsOpen = isOpen ? 'true' : 'false';
+  ui.settingsBackdrop.hidden = !isOpen;
+}
+
+function setAppMode(mode) {
+  const nextMode = mode === 'chat' ? 'chat' : 'connect';
+  ui.appShell.dataset.mode = nextMode;
+  if (nextMode === 'connect') {
+    setSettingsOpen(false);
+  }
+}
+
+function enterChatMode() {
+  if (!hasReadyConnection()) {
+    setStatus(ui.connectionStatus, '请先填写 Base URL、API Key，并选择或填写模型。', 'error');
+    setAppMode('connect');
+    return false;
+  }
+
+  saveState();
+  setSettingsOpen(false);
+  setAppMode('chat');
+  setStatus(ui.chatStatus, `已连接：${getCurrentModel()}`, 'success');
+  window.setTimeout(() => ui.prompt.focus(), 60);
+  return true;
 }
 
 function renderActiveModel() {
@@ -225,6 +266,7 @@ function updateControls() {
   const hasPrompt = Boolean(ui.prompt.value.trim());
   const busy = Boolean(state.controller);
   ui.fetchModels.disabled = busy || !hasConnection;
+  ui.enterChat.disabled = busy || !hasConnection || !hasModel;
   ui.send.disabled = busy || !hasConnection || !hasModel || !hasPrompt;
   ui.stop.disabled = !busy;
   ui.temperatureValue.textContent = ui.temperature.value;
@@ -272,6 +314,7 @@ async function fetchModels() {
     renderActiveModel();
     saveState();
     setStatus(ui.connectionStatus, `已获取 ${state.models.length} 个模型。`, 'success');
+    enterChatMode();
   } catch (error) {
     const message = error instanceof TypeError
       ? '请求失败，可能是网关未允许浏览器跨域访问。'
@@ -408,6 +451,9 @@ function exportChat() {
 ui.saveConfig.addEventListener('click', () => {
   saveState();
   setStatus(ui.connectionStatus, '已保存到当前浏览器。', 'success');
+  if (hasReadyConnection()) {
+    enterChatMode();
+  }
 });
 
 ui.clearConfig.addEventListener('click', () => {
@@ -416,6 +462,12 @@ ui.clearConfig.addEventListener('click', () => {
 });
 
 ui.fetchModels.addEventListener('click', fetchModels);
+
+ui.enterChat.addEventListener('click', enterChatMode);
+
+ui.connectionSettings.addEventListener('click', () => setSettingsOpen(true));
+ui.closeSettings.addEventListener('click', () => setSettingsOpen(false));
+ui.settingsBackdrop.addEventListener('click', () => setSettingsOpen(false));
 
 ui.manualModel.addEventListener('input', () => {
   if (ui.manualModel.value.trim()) {
@@ -465,3 +517,4 @@ loadSavedState();
 renderModels();
 renderMessages();
 updateControls();
+setAppMode(hasReadyConnection() ? 'chat' : 'connect');

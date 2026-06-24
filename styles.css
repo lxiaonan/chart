@@ -67,6 +67,59 @@ button:disabled {
   overflow: hidden;
 }
 
+.app-shell[data-mode="connect"] {
+  display: grid;
+  grid-template-columns: minmax(320px, 520px);
+  place-content: center;
+  padding: 20px;
+}
+
+.app-shell[data-mode="connect"] .control-panel {
+  position: static;
+  width: min(520px, calc(100vw - 40px));
+  height: min(760px, calc(100dvh - 40px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.app-shell[data-mode="connect"] .workspace,
+.app-shell[data-mode="connect"] .settings-backdrop,
+.app-shell[data-mode="connect"] .close-settings-button {
+  display: none;
+}
+
+.app-shell[data-mode="chat"] {
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-mode="chat"] .workspace {
+  grid-column: 1;
+}
+
+.app-shell[data-mode="chat"] .control-panel {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  width: min(390px, 92vw);
+  transform: translateX(-105%);
+  transition: transform 200ms ease;
+}
+
+.app-shell[data-mode="chat"][data-settings-open="true"] .control-panel {
+  transform: translateX(0);
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.48);
+}
+
 .control-panel {
   position: sticky;
   top: 0;
@@ -83,6 +136,13 @@ button:disabled {
 
 .brand-block {
   padding: 8px 0 24px;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .eyebrow,
@@ -217,6 +277,11 @@ input[type="range"] {
     transform 160ms ease,
     border-color 160ms ease,
     background 160ms ease;
+}
+
+.close-settings-button {
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .primary-button {
@@ -461,19 +526,35 @@ input[type="range"] {
 
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(176px, 34dvh) minmax(0, 1fr);
+    grid-template-rows: 1fr;
     height: 100svh;
     height: 100dvh;
     min-height: 0;
   }
 
+  .app-shell[data-mode="connect"] {
+    display: grid;
+    padding: 10px;
+  }
+
+  .app-shell[data-mode="connect"] .control-panel {
+    width: min(100%, calc(100vw - 20px));
+    height: min(100%, calc(100dvh - 20px));
+  }
+
+  .app-shell[data-mode="chat"] .control-panel {
+    position: fixed;
+    height: 100dvh;
+    width: min(420px, 94vw);
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
   .control-panel {
-    position: static;
-    height: auto;
+    height: 100dvh;
     min-height: 0;
     padding: 14px;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
   }
 
   .brand-block {
@@ -500,7 +581,7 @@ input[type="range"] {
 
   .workspace {
     grid-template-rows: auto minmax(0, 1fr) auto;
-    height: auto;
+    height: 100dvh;
     min-height: 0;
     padding: 10px;
     overflow: hidden;

@@ -7,12 +7,17 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div id="appShell" class="app-shell" data-mode="connect" data-settings-open="false">
+      <button id="settingsBackdrop" class="settings-backdrop" type="button" aria-label="关闭连接设置" hidden></button>
+
       <aside class="control-panel" aria-label="模型配置">
         <header class="brand-block">
-          <p class="eyebrow">Static Model Lab</p>
+          <div class="brand-row">
+            <p class="eyebrow">Static Model Lab</p>
+            <button id="closeSettings" class="ghost-button close-settings-button" type="button">关闭</button>
+          </div>
           <h1>模型实验台</h1>
-          <p>部署在 GitHub Pages 的纯前端版本，直接连接 OpenAI 兼容模型网关。</p>
+          <p>先连接 OpenAI 兼容网关。连接完成后进入聊天界面，配置会收进侧边设置。</p>
         </header>
 
         <section class="panel-block" aria-labelledby="connectionTitle">
@@ -38,6 +43,7 @@
 
           <div class="inline-actions">
             <button id="fetchModels" class="primary-button" type="button">获取模型</button>
+            <button id="enterChat" class="ghost-button" type="button" disabled>进入聊天</button>
             <button id="clearConfig" class="ghost-button" type="button">清除</button>
           </div>
           <p id="connectionStatus" class="status-text">填写 Key 后获取模型。</p>
@@ -87,6 +93,7 @@
             <strong id="activeModel">尚未选择</strong>
           </div>
           <div class="topbar-actions">
+            <button id="connectionSettings" class="ghost-button" type="button">连接</button>
             <button id="exportChat" class="ghost-button" type="button">导出</button>
             <button id="clearChat" class="ghost-button" type="button">清空</button>
           </div>
