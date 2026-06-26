@@ -22,6 +22,7 @@ const ui = {
   messages: document.querySelector('#messages'),
   imageLab: document.querySelector('#imageLab'),
   imageModel: document.querySelector('#imageModel'),
+  imageApiKey: document.querySelector('#imageApiKey'),
   imageSize: document.querySelector('#imageSize'),
   imagePrompt: document.querySelector('#imagePrompt'),
   generateImage: document.querySelector('#generateImage'),
@@ -77,6 +78,7 @@ function loadSavedState() {
     ui.systemPrompt.value = saved.systemPrompt || '';
     ui.temperature.value = saved.temperature || '0.8';
     ui.imageModel.value = saved.imageModel || 'gpt-image-2';
+    ui.imageApiKey.value = saved.imageApiKey || '';
     ui.imageSize.value = saved.imageSize || '1024x1024';
     state.selectedModel = saved.selectedModel || saved.manualModel || '';
     state.messages = Array.isArray(saved.messages) ? saved.messages : [];
@@ -96,6 +98,7 @@ function saveState({ includeMessages = true } = {}) {
     systemPrompt: ui.systemPrompt.value,
     temperature: ui.temperature.value,
     imageModel: ui.imageModel.value.trim(),
+    imageApiKey: ui.imageApiKey.value.trim(),
     imageSize: ui.imageSize.value,
     view: state.view,
     messages: includeMessages ? state.messages : [],
@@ -131,6 +134,13 @@ function buildUrl(path) {
 function authHeaders() {
   return {
     Authorization: `Bearer ${ui.apiKey.value.trim()}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+function imageAuthHeaders() {
+  return {
+    Authorization: `Bearer ${(ui.imageApiKey.value.trim() || ui.apiKey.value.trim())}`,
     'Content-Type': 'application/json',
   };
 }
@@ -364,6 +374,9 @@ function renderImageResults() {
 
 function updateControls() {
   const hasConnection = Boolean(normalizeBaseUrl(ui.baseUrl.value) && ui.apiKey.value.trim());
+  const hasImageConnection = Boolean(
+    normalizeBaseUrl(ui.baseUrl.value) && (ui.imageApiKey.value.trim() || ui.apiKey.value.trim()),
+  );
   const hasModel = Boolean(getCurrentModel());
   const hasPrompt = Boolean(ui.prompt.value.trim());
   const hasImagePrompt = Boolean(ui.imagePrompt.value.trim());
@@ -372,7 +385,7 @@ function updateControls() {
   ui.fetchModels.disabled = busy || !hasConnection;
   ui.enterChat.disabled = busy || !hasConnection || !hasModel;
   ui.send.disabled = busy || !hasConnection || !hasModel || !hasPrompt;
-  ui.generateImage.disabled = busy || !hasConnection || !hasImageModel || !hasImagePrompt;
+  ui.generateImage.disabled = busy || !hasImageConnection || !hasImageModel || !hasImagePrompt;
   ui.stop.disabled = !busy;
   ui.temperatureValue.textContent = ui.temperature.value;
   renderActiveModel();
@@ -393,7 +406,7 @@ function extractImageSources(payload) {
 async function requestImageGeneration({ signal, prompt = ui.imagePrompt.value.trim() } = {}) {
   const response = await fetch(buildUrl('/v1/images/generations'), {
     method: 'POST',
-    headers: authHeaders(),
+    headers: imageAuthHeaders(),
     signal,
     body: JSON.stringify({
       model: ui.imageModel.value.trim(),
@@ -841,6 +854,11 @@ ui.temperature.addEventListener('input', () => {
 });
 
 ui.imageModel.addEventListener('input', () => {
+  saveState();
+  updateControls();
+});
+
+ui.imageApiKey.addEventListener('input', () => {
   saveState();
   updateControls();
 });
