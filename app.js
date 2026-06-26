@@ -15,6 +15,7 @@ const ui = {
   manualModel: document.querySelector('#manualModel'),
   modelCount: document.querySelector('#modelCount'),
   modelList: document.querySelector('#modelList'),
+  imageBaseUrl: document.querySelector('#imageBaseUrl'),
   temperature: document.querySelector('#temperature'),
   temperatureValue: document.querySelector('#temperatureValue'),
   systemPrompt: document.querySelector('#systemPrompt'),
@@ -74,6 +75,7 @@ function loadSavedState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     ui.baseUrl.value = saved.baseUrl || DEFAULT_BASE_URL;
     ui.apiKey.value = saved.apiKey || '';
+    ui.imageBaseUrl.value = saved.imageBaseUrl || saved.baseUrl || DEFAULT_BASE_URL;
     ui.manualModel.value = saved.manualModel || '';
     ui.systemPrompt.value = saved.systemPrompt || '';
     ui.temperature.value = saved.temperature || '0.8';
@@ -93,6 +95,7 @@ function saveState({ includeMessages = true } = {}) {
   const payload = {
     baseUrl: ui.baseUrl.value.trim(),
     apiKey: ui.apiKey.value.trim(),
+    imageBaseUrl: ui.imageBaseUrl.value.trim(),
     manualModel: ui.manualModel.value.trim(),
     selectedModel: state.selectedModel,
     systemPrompt: ui.systemPrompt.value,
@@ -111,6 +114,8 @@ function clearSavedState() {
   localStorage.removeItem(STORAGE_KEY);
   ui.baseUrl.value = DEFAULT_BASE_URL;
   ui.apiKey.value = '';
+  ui.imageBaseUrl.value = DEFAULT_BASE_URL;
+  ui.imageApiKey.value = '';
   ui.manualModel.value = '';
   ui.systemPrompt.value = '';
   ui.temperature.value = '0.8';
@@ -131,6 +136,10 @@ function buildUrl(path) {
   return `${normalizeBaseUrl(ui.baseUrl.value)}${path}`;
 }
 
+function buildImageUrl(path) {
+  return `${normalizeBaseUrl(ui.imageBaseUrl.value)}${path}`;
+}
+
 function authHeaders() {
   return {
     Authorization: `Bearer ${ui.apiKey.value.trim()}`,
@@ -140,7 +149,7 @@ function authHeaders() {
 
 function imageAuthHeaders() {
   return {
-    Authorization: `Bearer ${(ui.imageApiKey.value.trim() || ui.apiKey.value.trim())}`,
+    Authorization: `Bearer ${ui.imageApiKey.value.trim()}`,
     'Content-Type': 'application/json',
   };
 }
@@ -375,7 +384,7 @@ function renderImageResults() {
 function updateControls() {
   const hasConnection = Boolean(normalizeBaseUrl(ui.baseUrl.value) && ui.apiKey.value.trim());
   const hasImageConnection = Boolean(
-    normalizeBaseUrl(ui.baseUrl.value) && (ui.imageApiKey.value.trim() || ui.apiKey.value.trim()),
+    normalizeBaseUrl(ui.imageBaseUrl.value) && ui.imageApiKey.value.trim(),
   );
   const hasModel = Boolean(getCurrentModel());
   const hasPrompt = Boolean(ui.prompt.value.trim());
@@ -404,7 +413,7 @@ function extractImageSources(payload) {
 }
 
 async function requestImageGeneration({ signal, prompt = ui.imagePrompt.value.trim() } = {}) {
-  const response = await fetch(buildUrl('/v1/images/generations'), {
+  const response = await fetch(buildImageUrl('/v1/images/generations'), {
     method: 'POST',
     headers: imageAuthHeaders(),
     signal,
@@ -821,7 +830,12 @@ function exportChat() {
 
 ui.saveConfig.addEventListener('click', () => {
   saveState();
-  setStatus(ui.connectionStatus, '已保存到当前浏览器。', 'success');
+  const hasImageConnection = Boolean(normalizeBaseUrl(ui.imageBaseUrl.value) && ui.imageApiKey.value.trim());
+  setStatus(
+    ui.connectionStatus,
+    hasImageConnection ? '聊天和生图连接已保存到当前浏览器。' : '聊天连接已保存；生图连接可稍后补充。',
+    'success',
+  );
   if (hasReadyConnection()) {
     enterChatMode();
   }
@@ -876,6 +890,10 @@ ui.imageMode.addEventListener('click', () => setView('image'));
 ui.systemPrompt.addEventListener('input', () => saveState());
 ui.baseUrl.addEventListener('input', updateControls);
 ui.apiKey.addEventListener('input', updateControls);
+ui.imageBaseUrl.addEventListener('input', () => {
+  saveState();
+  updateControls();
+});
 ui.prompt.addEventListener('input', updateControls);
 
 ui.prompt.addEventListener('keydown', event => {

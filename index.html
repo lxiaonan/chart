@@ -24,7 +24,7 @@
           <div class="section-head">
             <div>
               <span class="section-index">01</span>
-              <h2 id="connectionTitle">连接</h2>
+              <h2 id="connectionTitle">聊天连接</h2>
             </div>
             <button id="saveConfig" class="icon-button text-button" type="button" title="保存到本机">
               保存
@@ -32,12 +32,12 @@
           </div>
 
           <label class="field">
-            <span>Base URL</span>
+            <span>聊天 Base URL</span>
             <input id="baseUrl" type="url" autocomplete="off" spellcheck="false" />
           </label>
 
           <label class="field">
-            <span>API Key</span>
+            <span>聊天 API Key</span>
             <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
           </label>
 
@@ -49,10 +49,29 @@
           <p id="connectionStatus" class="status-text">填写 Key 后获取模型。</p>
         </section>
 
-        <section class="panel-block model-block" aria-labelledby="modelTitle">
+        <section class="panel-block" aria-labelledby="imageConnectionTitle">
           <div class="section-head">
             <div>
               <span class="section-index">02</span>
+              <h2 id="imageConnectionTitle">生图连接</h2>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>生图 Base URL</span>
+            <input id="imageBaseUrl" type="url" autocomplete="off" spellcheck="false" />
+          </label>
+
+          <label class="field">
+            <span>生图 API Key</span>
+            <input id="imageApiKey" type="password" autocomplete="off" placeholder="sk-..." />
+          </label>
+        </section>
+
+        <section class="panel-block model-block" aria-labelledby="modelTitle">
+          <div class="section-head">
+            <div>
+              <span class="section-index">03</span>
               <h2 id="modelTitle">模型</h2>
             </div>
             <span id="modelCount" class="count-pill">0</span>
@@ -69,7 +88,7 @@
         <section class="panel-block" aria-labelledby="optionsTitle">
           <div class="section-head">
             <div>
-              <span class="section-index">03</span>
+              <span class="section-index">04</span>
               <h2 id="optionsTitle">参数</h2>
             </div>
           </div>
@@ -118,11 +137,6 @@
               <label class="field">
                 <span>生图模型</span>
                 <input id="imageModel" type="text" autocomplete="off" spellcheck="false" value="gpt-image-2" />
-              </label>
-
-              <label class="field">
-                <span>生图 API Key</span>
-                <input id="imageApiKey" type="password" autocomplete="off" placeholder="留空则使用主 API Key" />
               </label>
 
               <label class="field">
