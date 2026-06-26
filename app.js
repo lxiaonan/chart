@@ -412,6 +412,57 @@ function extractImageSources(payload) {
     .filter(Boolean);
 }
 
+function isPromptPolicyError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /(?:content[_\s-]?policy|safety|safe|blocked|moderation|policy|prompt.*(?:reject|violate|block)|forbidden|sensitive|限制词|敏感词|违规|违禁|安全|审核|不合规|被拒绝|无法生成)/i.test(
+    message,
+  );
+}
+
+function cleanRewrittenPrompt(text, fallback) {
+  const cleaned = String(text || '')
+    .replace(/^```(?:text|markdown)?/i, '')
+    .replace(/```$/i, '')
+    .replace(/^["“”']|["“”']$/g, '')
+    .trim();
+  return cleaned || fallback;
+}
+
+async function rewriteImagePrompt(originalPrompt, errorMessage, signal) {
+  if (!hasReadyConnection()) {
+    return originalPrompt;
+  }
+
+  const response = await fetch(buildUrl('/v1/chat/completions'), {
+    method: 'POST',
+    headers: authHeaders(),
+    signal,
+    body: JSON.stringify({
+      model: getCurrentModel(),
+      temperature: 0.4,
+      stream: false,
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你是图片提示词安全改写助手。把用户的生图提示词改写为安全、合规、可生成的版本，保留主体、构图、风格、情绪和审美。删除或柔化可能触发限制的词。只输出改写后的提示词，不解释。',
+        },
+        {
+          role: 'user',
+          content: `原始提示词：${originalPrompt}\n\n生图接口错误：${errorMessage}`,
+        },
+      ],
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || payload?.error || `提示词改写失败：HTTP ${response.status}`);
+  }
+
+  return cleanRewrittenPrompt(extractAssistantText(payload), originalPrompt);
+}
+
 async function requestImageGeneration({ signal, prompt = ui.imagePrompt.value.trim() } = {}) {
   const response = await fetch(buildImageUrl('/v1/images/generations'), {
     method: 'POST',
@@ -441,8 +492,8 @@ async function requestImageGeneration({ signal, prompt = ui.imagePrompt.value.tr
 }
 
 async function generateImageWithRetries() {
-  const prompt = ui.imagePrompt.value.trim();
-  if (!prompt || state.imageController) {
+  const originalPrompt = ui.imagePrompt.value.trim();
+  if (!originalPrompt || state.imageController) {
     return;
   }
 
@@ -451,13 +502,22 @@ async function generateImageWithRetries() {
 
   try {
     let lastError = null;
+    let currentPrompt = originalPrompt;
+    let didRewritePrompt = false;
     for (let attempt = 1; attempt <= IMAGE_RETRY_ATTEMPTS; attempt += 1) {
-      setStatus(ui.imageStatus, `正在生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`, 'busy');
+      setStatus(
+        ui.imageStatus,
+        `${didRewritePrompt ? '已改写提示词，' : ''}正在生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`,
+        'busy',
+      );
       try {
-        const result = await requestImageGeneration({ signal: state.imageController.signal });
+        const result = await requestImageGeneration({
+          prompt: currentPrompt,
+          signal: state.imageController.signal,
+        });
         const created = result.sources.map(src => ({
           src,
-          prompt: result.revisedPrompt || prompt,
+          prompt: result.revisedPrompt || currentPrompt,
           createdAt: new Date().toISOString(),
         }));
         state.imageResults = [...created, ...state.imageResults].slice(0, 20);
@@ -469,6 +529,24 @@ async function generateImageWithRetries() {
         lastError = error;
         if (error instanceof DOMException && error.name === 'AbortError') {
           throw error;
+        }
+        if (isPromptPolicyError(error)) {
+          try {
+            setStatus(ui.imageStatus, '提示词可能触发限制，正在用聊天模型改写...', 'busy');
+            const rewritten = await rewriteImagePrompt(
+              currentPrompt,
+              error instanceof Error ? error.message : String(error),
+              state.imageController.signal,
+            );
+            if (rewritten && rewritten !== currentPrompt) {
+              currentPrompt = rewritten;
+              didRewritePrompt = true;
+              ui.imagePrompt.value = rewritten;
+              saveState();
+            }
+          } catch (rewriteError) {
+            lastError = rewriteError;
+          }
         }
       }
     }
@@ -497,24 +575,32 @@ async function generateImageFromChat({ prompt, assistantIndex }) {
 
   try {
     let lastError = null;
+    let currentPrompt = prompt;
+    let didRewritePrompt = false;
     for (let attempt = 1; attempt <= IMAGE_RETRY_ATTEMPTS; attempt += 1) {
       state.messages[assistantIndex] = {
         role: 'assistant',
-        content: `我来画，稍等一下。（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）`,
+        content: `${
+          didRewritePrompt ? '我把描述换了个更容易生成的说法，继续画。' : '我来画，稍等一下。'
+        }（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）`,
       };
       renderMessages({ forceScroll: true });
-      setStatus(ui.chatStatus, `正在为你生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`, 'busy');
+      setStatus(
+        ui.chatStatus,
+        `${didRewritePrompt ? '已改写提示词，' : ''}正在为你生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`,
+        'busy',
+      );
 
       try {
         const result = await requestImageGeneration({
-          prompt,
+          prompt: currentPrompt,
           signal: state.imageController.signal,
         });
         const imageMessage = {
           role: 'assistant',
           type: 'image',
           src: result.sources[0],
-          prompt: result.revisedPrompt || prompt,
+          prompt: result.revisedPrompt || currentPrompt,
           content: '',
         };
         state.messages[assistantIndex] = imageMessage;
@@ -535,6 +621,27 @@ async function generateImageFromChat({ prompt, assistantIndex }) {
         lastError = error;
         if (error instanceof DOMException && error.name === 'AbortError') {
           throw error;
+        }
+        if (isPromptPolicyError(error)) {
+          try {
+            state.messages[assistantIndex] = {
+              role: 'assistant',
+              content: '这个描述可能被拦了，我换个更温和的说法再试试。',
+            };
+            renderMessages({ forceScroll: true });
+            setStatus(ui.chatStatus, '提示词可能触发限制，正在用聊天模型改写...', 'busy');
+            const rewritten = await rewriteImagePrompt(
+              currentPrompt,
+              error instanceof Error ? error.message : String(error),
+              state.imageController.signal,
+            );
+            if (rewritten && rewritten !== currentPrompt) {
+              currentPrompt = rewritten;
+              didRewritePrompt = true;
+            }
+          } catch (rewriteError) {
+            lastError = rewriteError;
+          }
         }
       }
     }
