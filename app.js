@@ -570,6 +570,11 @@ async function generateImageWithRetries() {
 }
 
 async function generateImageFromChat({ prompt, assistantIndex }) {
+  state.messages[assistantIndex] = {
+    role: 'assistant',
+    content: '生图中...',
+  };
+  renderMessages({ forceScroll: true });
   state.imageController = new AbortController();
   updateControls();
 
@@ -578,13 +583,6 @@ async function generateImageFromChat({ prompt, assistantIndex }) {
     let currentPrompt = prompt;
     let didRewritePrompt = false;
     for (let attempt = 1; attempt <= IMAGE_RETRY_ATTEMPTS; attempt += 1) {
-      state.messages[assistantIndex] = {
-        role: 'assistant',
-        content: `${
-          didRewritePrompt ? '我把描述换了个更容易生成的说法，继续画。' : '我来画，稍等一下。'
-        }（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）`,
-      };
-      renderMessages({ forceScroll: true });
       setStatus(
         ui.chatStatus,
         `${didRewritePrompt ? '已改写提示词，' : ''}正在为你生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`,
