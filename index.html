@@ -107,6 +107,44 @@
 
         <section id="messages" class="messages" aria-live="polite"></section>
 
+        <section id="imageLab" class="image-lab" aria-live="polite" hidden>
+          <div class="image-lab-scroll">
+            <section class="image-lab-card image-config-card">
+              <div>
+                <p class="eyebrow">Image Studio</p>
+                <h2>生图</h2>
+              </div>
+
+              <label class="field">
+                <span>生图模型</span>
+                <input id="imageModel" type="text" autocomplete="off" spellcheck="false" value="gpt-image-2" />
+              </label>
+
+              <label class="field">
+                <span>尺寸</span>
+                <select id="imageSize">
+                  <option value="1024x1024">1024x1024</option>
+                  <option value="1024x1536">1024x1536</option>
+                  <option value="1536x1024">1536x1024</option>
+                  <option value="512x512">512x512</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>提示词</span>
+                <textarea id="imagePrompt" rows="5" placeholder="描述想生成的图片"></textarea>
+              </label>
+
+              <button id="generateImage" class="primary-button image-generate-button" type="button" disabled>
+                生成图片
+              </button>
+              <p id="imageStatus" class="status-text">填写提示词后生成。</p>
+            </section>
+
+            <section id="imageResults" class="image-results" aria-label="生图结果"></section>
+          </div>
+        </section>
+
         <form id="composer" class="composer">
           <label class="sr-only" for="prompt">继续对话</label>
           <textarea id="prompt" rows="1" placeholder=""></textarea>
@@ -118,6 +156,11 @@
             </div>
           </div>
         </form>
+
+        <nav class="mode-tabs" aria-label="功能切换">
+          <button id="chatMode" type="button" data-active="true">聊天</button>
+          <button id="imageMode" type="button">生图</button>
+        </nav>
       </main>
     </div>
 
@@ -129,6 +172,16 @@
           <button class="copy-button" type="button">复制</button>
         </div>
         <div class="message-body"></div>
+      </article>
+    </template>
+
+    <template id="imageResultTemplate">
+      <article class="image-result-card">
+        <img alt="生成图片" />
+        <div>
+          <p class="image-result-prompt"></p>
+          <a class="ghost-button image-download-link" href="#" target="_blank" rel="noreferrer">打开图片</a>
+        </div>
       </article>
     </template>
 

@@ -20,6 +20,13 @@ const ui = {
   systemPrompt: document.querySelector('#systemPrompt'),
   activeModel: document.querySelector('#activeModel'),
   messages: document.querySelector('#messages'),
+  imageLab: document.querySelector('#imageLab'),
+  imageModel: document.querySelector('#imageModel'),
+  imageSize: document.querySelector('#imageSize'),
+  imagePrompt: document.querySelector('#imagePrompt'),
+  generateImage: document.querySelector('#generateImage'),
+  imageStatus: document.querySelector('#imageStatus'),
+  imageResults: document.querySelector('#imageResults'),
   composer: document.querySelector('#composer'),
   prompt: document.querySelector('#prompt'),
   chatStatus: document.querySelector('#chatStatus'),
@@ -29,17 +36,24 @@ const ui = {
   clearChat: document.querySelector('#clearChat'),
   exportChat: document.querySelector('#exportChat'),
   template: document.querySelector('#messageTemplate'),
+  imageTemplate: document.querySelector('#imageResultTemplate'),
+  chatMode: document.querySelector('#chatMode'),
+  imageMode: document.querySelector('#imageMode'),
 };
 
 const state = {
   models: [],
   selectedModel: '',
   messages: [],
+  imageResults: [],
   controller: null,
+  imageController: null,
+  view: 'chat',
 };
 
 const RETRY_ATTEMPTS_PER_MODEL = 5;
 const FALLBACK_MODEL_LIMIT = 3;
+const IMAGE_RETRY_ATTEMPTS = 5;
 
 function normalizeBaseUrl(value) {
   const text = String(value || '').trim();
@@ -62,8 +76,12 @@ function loadSavedState() {
     ui.manualModel.value = saved.manualModel || '';
     ui.systemPrompt.value = saved.systemPrompt || '';
     ui.temperature.value = saved.temperature || '0.8';
+    ui.imageModel.value = saved.imageModel || 'gpt-image-2';
+    ui.imageSize.value = saved.imageSize || '1024x1024';
     state.selectedModel = saved.selectedModel || saved.manualModel || '';
     state.messages = Array.isArray(saved.messages) ? saved.messages : [];
+    state.imageResults = Array.isArray(saved.imageResults) ? saved.imageResults : [];
+    state.view = saved.view === 'image' ? 'image' : 'chat';
   } catch {
     ui.baseUrl.value = DEFAULT_BASE_URL;
   }
@@ -77,7 +95,11 @@ function saveState({ includeMessages = true } = {}) {
     selectedModel: state.selectedModel,
     systemPrompt: ui.systemPrompt.value,
     temperature: ui.temperature.value,
+    imageModel: ui.imageModel.value.trim(),
+    imageSize: ui.imageSize.value,
+    view: state.view,
     messages: includeMessages ? state.messages : [],
+    imageResults: state.imageResults,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
@@ -92,8 +114,10 @@ function clearSavedState() {
   state.selectedModel = '';
   state.models = [];
   state.messages = [];
+  state.imageResults = [];
   renderModels();
   renderMessages({ forceScroll: true });
+  renderImageResults();
   renderActiveModel();
   setAppMode('connect');
   setSettingsOpen(false);
@@ -130,6 +154,17 @@ function setAppMode(mode) {
   if (nextMode === 'connect') {
     setSettingsOpen(false);
   }
+}
+
+function setView(view) {
+  state.view = view === 'image' ? 'image' : 'chat';
+  ui.appShell.dataset.view = state.view;
+  ui.messages.hidden = state.view !== 'chat';
+  ui.imageLab.hidden = state.view !== 'image';
+  ui.chatMode.dataset.active = state.view === 'chat' ? 'true' : 'false';
+  ui.imageMode.dataset.active = state.view === 'image' ? 'true' : 'false';
+  saveState();
+  updateControls();
 }
 
 function enterChatMode() {
@@ -263,17 +298,140 @@ function renderMessages({ forceScroll = false } = {}) {
   }
 }
 
+function renderImageResults() {
+  ui.imageResults.innerHTML = '';
+  if (state.imageResults.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state image-empty-state';
+    empty.innerHTML = `
+      <div class="empty-state-inner">
+        <p class="eyebrow">Image Lab</p>
+        <h2>输入提示词，生成图片。</h2>
+        <p>失败会自动重试 5 次，结果会保存在当前浏览器。</p>
+      </div>
+    `;
+    ui.imageResults.append(empty);
+    return;
+  }
+
+  for (const item of state.imageResults) {
+    const fragment = ui.imageTemplate.content.cloneNode(true);
+    const img = fragment.querySelector('img');
+    const prompt = fragment.querySelector('.image-result-prompt');
+    const link = fragment.querySelector('.image-download-link');
+    img.src = item.src;
+    img.alt = item.prompt || '生成图片';
+    prompt.textContent = item.prompt || '生成图片';
+    link.href = item.src;
+    ui.imageResults.append(fragment);
+  }
+}
+
 function updateControls() {
   const hasConnection = Boolean(normalizeBaseUrl(ui.baseUrl.value) && ui.apiKey.value.trim());
   const hasModel = Boolean(getCurrentModel());
   const hasPrompt = Boolean(ui.prompt.value.trim());
-  const busy = Boolean(state.controller);
+  const hasImagePrompt = Boolean(ui.imagePrompt.value.trim());
+  const hasImageModel = Boolean(ui.imageModel.value.trim());
+  const busy = Boolean(state.controller || state.imageController);
   ui.fetchModels.disabled = busy || !hasConnection;
   ui.enterChat.disabled = busy || !hasConnection || !hasModel;
   ui.send.disabled = busy || !hasConnection || !hasModel || !hasPrompt;
+  ui.generateImage.disabled = busy || !hasConnection || !hasImageModel || !hasImagePrompt;
   ui.stop.disabled = !busy;
   ui.temperatureValue.textContent = ui.temperature.value;
   renderActiveModel();
+}
+
+function extractImageSources(payload) {
+  const data = Array.isArray(payload?.data) ? payload.data : [];
+  return data
+    .map(item => {
+      if (item?.url) {
+        return item.url;
+      }
+      return item?.b64_json ? `data:image/png;base64,${item.b64_json}` : '';
+    })
+    .filter(Boolean);
+}
+
+async function requestImageGeneration({ signal }) {
+  const response = await fetch(buildUrl('/v1/images/generations'), {
+    method: 'POST',
+    headers: authHeaders(),
+    signal,
+    body: JSON.stringify({
+      model: ui.imageModel.value.trim(),
+      prompt: ui.imagePrompt.value.trim(),
+      size: ui.imageSize.value,
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || payload?.error || `生图失败：HTTP ${response.status}`);
+  }
+
+  const sources = extractImageSources(payload);
+  if (sources.length === 0) {
+    throw new Error('生图接口没有返回图片。');
+  }
+
+  return {
+    sources,
+    revisedPrompt: payload?.data?.[0]?.revised_prompt || ui.imagePrompt.value.trim(),
+  };
+}
+
+async function generateImageWithRetries() {
+  const prompt = ui.imagePrompt.value.trim();
+  if (!prompt || state.imageController) {
+    return;
+  }
+
+  state.imageController = new AbortController();
+  updateControls();
+
+  try {
+    let lastError = null;
+    for (let attempt = 1; attempt <= IMAGE_RETRY_ATTEMPTS; attempt += 1) {
+      setStatus(ui.imageStatus, `正在生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`, 'busy');
+      try {
+        const result = await requestImageGeneration({ signal: state.imageController.signal });
+        const created = result.sources.map(src => ({
+          src,
+          prompt: result.revisedPrompt || prompt,
+          createdAt: new Date().toISOString(),
+        }));
+        state.imageResults = [...created, ...state.imageResults].slice(0, 20);
+        renderImageResults();
+        saveState();
+        setStatus(ui.imageStatus, '图片已生成。', 'success');
+        return;
+      } catch (error) {
+        lastError = error;
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error(
+      `连续重试 ${IMAGE_RETRY_ATTEMPTS} 次后仍未生成图片。最后错误：${
+        lastError instanceof Error ? lastError.message : '未知错误'
+      }`,
+    );
+  } catch (error) {
+    const aborted = error instanceof DOMException && error.name === 'AbortError';
+    setStatus(
+      ui.imageStatus,
+      aborted ? '已停止生成。' : error instanceof TypeError ? '请求失败，可能是 CORS 或网络问题。' : error.message,
+      aborted ? 'idle' : 'error',
+    );
+  } finally {
+    state.imageController = null;
+    updateControls();
+  }
 }
 
 function extractAssistantText(payload) {
@@ -569,6 +727,21 @@ ui.temperature.addEventListener('input', () => {
   updateControls();
 });
 
+ui.imageModel.addEventListener('input', () => {
+  saveState();
+  updateControls();
+});
+
+ui.imageSize.addEventListener('change', () => {
+  saveState();
+  updateControls();
+});
+
+ui.imagePrompt.addEventListener('input', updateControls);
+ui.generateImage.addEventListener('click', generateImageWithRetries);
+ui.chatMode.addEventListener('click', () => setView('chat'));
+ui.imageMode.addEventListener('click', () => setView('image'));
+
 ui.systemPrompt.addEventListener('input', () => saveState());
 ui.baseUrl.addEventListener('input', updateControls);
 ui.apiKey.addEventListener('input', updateControls);
@@ -588,6 +761,7 @@ ui.composer.addEventListener('submit', event => {
 
 ui.stop.addEventListener('click', () => {
   state.controller?.abort();
+  state.imageController?.abort();
 });
 
 ui.clearChat.addEventListener('click', () => {
@@ -603,5 +777,7 @@ ui.exportChat.addEventListener('click', exportChat);
 loadSavedState();
 renderModels();
 renderMessages();
+renderImageResults();
 updateControls();
 setAppMode(hasReadyConnection() ? 'chat' : 'connect');
+setView(state.view);

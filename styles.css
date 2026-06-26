@@ -218,6 +218,7 @@ h2 {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -238,7 +239,13 @@ textarea {
   line-height: 1.6;
 }
 
+select {
+  height: 42px;
+  padding: 0 12px;
+}
+
 input:focus,
+select:focus,
 textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(232, 190, 92, 0.16);
@@ -358,7 +365,7 @@ input[type="range"] {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   height: 100vh;
   height: 100dvh;
   min-height: 0;
@@ -429,6 +436,100 @@ input[type="range"] {
   background: rgba(12, 14, 11, 0.58);
   scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
+}
+
+.image-lab {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.image-lab-scroll {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(12, 14, 11, 0.58);
+  -webkit-overflow-scrolling: touch;
+}
+
+.image-lab-card,
+.image-result-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(27, 30, 24, 0.72);
+}
+
+.image-lab-card {
+  max-width: 760px;
+  margin: 0 auto 16px;
+  padding: 18px;
+}
+
+.image-lab-card h2 {
+  margin: 4px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+}
+
+.image-generate-button {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.image-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.image-result-card {
+  overflow: hidden;
+}
+
+.image-result-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #0b0d0a;
+}
+
+.image-result-card div {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.image-result-prompt {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mode-tabs button {
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+}
+
+.mode-tabs button[data-active="true"] {
+  border-color: var(--accent);
+  background: rgba(232, 190, 92, 0.14);
+  color: var(--text);
+  font-weight: 800;
 }
 
 .empty-state {
@@ -611,7 +712,7 @@ input[type="range"] {
   }
 
   .workspace {
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     height: 100dvh;
     min-height: 0;
     padding: 0;
@@ -668,6 +769,55 @@ input[type="range"] {
     border: 0;
     border-radius: 0;
     background: #ededed;
+  }
+
+  .image-lab {
+    background: #ededed;
+  }
+
+  .image-lab-scroll {
+    padding: 12px;
+    border: 0;
+    border-radius: 0;
+    background: #ededed;
+  }
+
+  .image-lab-card,
+  .image-result-card {
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #151515;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  }
+
+  .image-lab-card {
+    padding: 14px;
+  }
+
+  .image-lab-card h2 {
+    color: #151515;
+    font-size: 28px;
+  }
+
+  .image-lab .field span {
+    color: #5f5f5f;
+  }
+
+  .image-lab input,
+  .image-lab select,
+  .image-lab textarea {
+    border: 1px solid #dddddd;
+    background: #f8f8f8;
+    color: #151515;
+  }
+
+  .image-results {
+    grid-template-columns: 1fr;
+  }
+
+  .image-result-prompt {
+    color: #4f4f4f;
   }
 
   .message {
@@ -772,6 +922,35 @@ input[type="range"] {
     border-radius: 0;
     background: #f7f7f7;
     box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .app-shell[data-view="image"] .messages,
+  .app-shell[data-view="image"] .composer {
+    display: none;
+  }
+
+  .app-shell[data-view="chat"] .image-lab {
+    display: none;
+  }
+
+  .mode-tabs {
+    margin-top: 0;
+    padding: 6px 8px max(6px, env(safe-area-inset-bottom));
+    background: #f7f7f7;
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .mode-tabs button {
+    min-height: 34px;
+    border-color: #d8d8d8;
+    background: #ffffff;
+    color: #555555;
+  }
+
+  .mode-tabs button[data-active="true"] {
+    border-color: #07c160;
+    background: #07c160;
+    color: #ffffff;
   }
 
   .composer textarea {
