@@ -256,10 +256,119 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function renderInlineMarkdown(value) {
+  return escapeHtml(value)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+    );
+}
+
+function renderMarkdown(content) {
+  const codeBlocks = [];
+  const source = String(content || '').replace(/\r\n/g, '\n');
+  const withoutCodeBlocks = source.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, language = '', code = '') => {
+    const index = codeBlocks.length;
+    codeBlocks.push(
+      `<pre><code data-language="${escapeHtml(language)}">${escapeHtml(code.trim())}</code></pre>`,
+    );
+    return `\n@@CODE_BLOCK_${index}@@\n`;
+  });
+
+  const lines = withoutCodeBlocks.split('\n');
+  const html = [];
+  let listType = '';
+  let paragraph = [];
+
+  function flushParagraph() {
+    if (paragraph.length === 0) {
+      return;
+    }
+    html.push(`<p>${renderInlineMarkdown(paragraph.join(' '))}</p>`);
+    paragraph = [];
+  }
+
+  function closeList() {
+    if (!listType) {
+      return;
+    }
+    html.push(`</${listType}>`);
+    listType = '';
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    const codeMatch = trimmed.match(/^@@CODE_BLOCK_(\d+)@@$/);
+    if (codeMatch) {
+      flushParagraph();
+      closeList();
+      html.push(codeBlocks[Number(codeMatch[1])] || '');
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      const level = heading[1].length + 2;
+      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const quote = trimmed.match(/^>\s?(.+)$/);
+    if (quote) {
+      flushParagraph();
+      closeList();
+      html.push(`<blockquote>${renderInlineMarkdown(quote[1])}</blockquote>`);
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+    if (unordered) {
+      flushParagraph();
+      if (listType !== 'ul') {
+        closeList();
+        listType = 'ul';
+        html.push('<ul>');
+      }
+      html.push(`<li>${renderInlineMarkdown(unordered[1])}</li>`);
+      continue;
+    }
+
+    const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      if (listType !== 'ol') {
+        closeList();
+        listType = 'ol';
+        html.push('<ol>');
+      }
+      html.push(`<li>${renderInlineMarkdown(ordered[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    paragraph.push(trimmed);
+  }
+
+  flushParagraph();
+  closeList();
+  return html.join('');
+}
+
 function renderMessageBody(body, content) {
-  body.innerHTML = escapeHtml(content)
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/\n/g, '<br>');
+  body.innerHTML = renderMarkdown(content);
 }
 
 function renderImageMessageBody(body, message) {
