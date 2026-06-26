@@ -243,6 +243,37 @@ function renderMessageBody(body, content) {
     .replace(/\n/g, '<br>');
 }
 
+function renderImageMessageBody(body, message) {
+  body.classList.add('message-body-image');
+  const figure = document.createElement('figure');
+  figure.className = 'chat-image-figure';
+
+  const img = document.createElement('img');
+  img.src = message.src;
+  img.alt = message.prompt || '生成图片';
+  img.loading = 'lazy';
+  figure.append(img);
+
+  const caption = document.createElement('figcaption');
+  caption.textContent = message.prompt || '生成图片';
+  figure.append(caption);
+
+  const link = document.createElement('a');
+  link.href = message.src;
+  link.target = '_blank';
+  link.rel = 'noreferrer';
+  link.textContent = '打开图片';
+  figure.append(link);
+
+  body.replaceChildren(figure);
+}
+
+function isImageIntent(text) {
+  return /(?:生图|画一张|画个|画一下|生成(?:一张)?(?:图片|图|头像|海报|插画|照片)|做(?:一张|个)?(?:图片|图|头像|海报)|出图|配图|image|draw|generate\s+(?:an?\s+)?image|make\s+(?:an?\s+)?image)/i.test(
+    text,
+  );
+}
+
 function isMessagesNearBottom() {
   const distanceFromBottom =
     ui.messages.scrollHeight - ui.messages.scrollTop - ui.messages.clientHeight;
@@ -277,15 +308,19 @@ function renderMessages({ forceScroll = false } = {}) {
     const copy = fragment.querySelector('.copy-button');
     article.dataset.role = message.role;
     role.textContent = message.role === 'assistant' ? '助手' : '你';
-    renderMessageBody(body, message.content);
+    if (message.type === 'image') {
+      renderImageMessageBody(body, message);
+    } else {
+      renderMessageBody(body, message.content);
+    }
     copy.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(message.type === 'image' ? message.src : message.content);
       copy.textContent = '已复制';
       window.setTimeout(() => {
         copy.textContent = '复制';
       }, 1200);
     });
-    copy.hidden = !message.content;
+    copy.hidden = message.type === 'image' ? !message.src : !message.content;
     copy.dataset.index = String(index);
     ui.messages.append(fragment);
   });
@@ -355,14 +390,14 @@ function extractImageSources(payload) {
     .filter(Boolean);
 }
 
-async function requestImageGeneration({ signal }) {
+async function requestImageGeneration({ signal, prompt = ui.imagePrompt.value.trim() } = {}) {
   const response = await fetch(buildUrl('/v1/images/generations'), {
     method: 'POST',
     headers: authHeaders(),
     signal,
     body: JSON.stringify({
       model: ui.imageModel.value.trim(),
-      prompt: ui.imagePrompt.value.trim(),
+      prompt,
       size: ui.imageSize.value,
     }),
   });
@@ -379,7 +414,7 @@ async function requestImageGeneration({ signal }) {
 
   return {
     sources,
-    revisedPrompt: payload?.data?.[0]?.revised_prompt || ui.imagePrompt.value.trim(),
+    revisedPrompt: payload?.data?.[0]?.revised_prompt || prompt,
   };
 }
 
@@ -430,6 +465,78 @@ async function generateImageWithRetries() {
     );
   } finally {
     state.imageController = null;
+    updateControls();
+  }
+}
+
+async function generateImageFromChat({ prompt, assistantIndex }) {
+  state.imageController = new AbortController();
+  updateControls();
+
+  try {
+    let lastError = null;
+    for (let attempt = 1; attempt <= IMAGE_RETRY_ATTEMPTS; attempt += 1) {
+      state.messages[assistantIndex] = {
+        role: 'assistant',
+        content: `我来画，稍等一下。（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）`,
+      };
+      renderMessages({ forceScroll: true });
+      setStatus(ui.chatStatus, `正在为你生成图片（第 ${attempt}/${IMAGE_RETRY_ATTEMPTS} 次）...`, 'busy');
+
+      try {
+        const result = await requestImageGeneration({
+          prompt,
+          signal: state.imageController.signal,
+        });
+        const imageMessage = {
+          role: 'assistant',
+          type: 'image',
+          src: result.sources[0],
+          prompt: result.revisedPrompt || prompt,
+          content: '',
+        };
+        state.messages[assistantIndex] = imageMessage;
+        state.imageResults = [
+          {
+            src: imageMessage.src,
+            prompt: imageMessage.prompt,
+            createdAt: new Date().toISOString(),
+          },
+          ...state.imageResults,
+        ].slice(0, 20);
+        renderMessages({ forceScroll: true });
+        renderImageResults();
+        saveState();
+        setStatus(ui.chatStatus, '图片生成好了。', 'success');
+        return;
+      } catch (error) {
+        lastError = error;
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error(
+      `连续重试 ${IMAGE_RETRY_ATTEMPTS} 次后仍未生成图片。最后错误：${
+        lastError instanceof Error ? lastError.message : '未知错误'
+      }`,
+    );
+  } catch (error) {
+    const aborted = error instanceof DOMException && error.name === 'AbortError';
+    state.messages[assistantIndex] = {
+      role: 'assistant',
+      content: aborted
+        ? '我先停下啦。'
+        : `这次图片没生成出来：${
+            error instanceof TypeError ? '可能是 CORS 或网络问题。' : error.message
+          }`,
+    };
+    renderMessages({ forceScroll: true });
+    setStatus(ui.chatStatus, aborted ? '已停止生成。' : '生图失败。', aborted ? 'idle' : 'error');
+  } finally {
+    state.imageController = null;
+    saveState();
     updateControls();
   }
 }
@@ -645,9 +752,15 @@ async function sendMessage() {
   state.messages.push({ role: 'assistant', content: '' });
   const assistantIndex = state.messages.length - 1;
   ui.prompt.value = '';
-  state.controller = new AbortController();
   renderMessages({ forceScroll: true });
   updateControls();
+
+  if (isImageIntent(prompt)) {
+    await generateImageFromChat({ prompt, assistantIndex });
+    return;
+  }
+
+  state.controller = new AbortController();
   setStatus(ui.chatStatus, '正在请求模型...', 'busy');
 
   try {
