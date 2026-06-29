@@ -56,7 +56,6 @@ const state = {
 const RETRY_ATTEMPTS_PER_MODEL = 5;
 const FALLBACK_MODEL_LIMIT = 3;
 const IMAGE_RETRY_ATTEMPTS = 5;
-const RANDOM_COMPANION_IMAGE_URL = 'https://veil.ortlinde.com/v1/random';
 
 function normalizeBaseUrl(value) {
   const text = String(value || '').trim();
@@ -139,22 +138,6 @@ function buildUrl(path) {
 
 function buildImageUrl(path) {
   return `${normalizeBaseUrl(ui.imageBaseUrl.value)}${path}`;
-}
-
-function buildRandomCompanionImageUrl() {
-  const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${RANDOM_COMPANION_IMAGE_URL}?chat=${encodeURIComponent(nonce)}`;
-}
-
-function createRandomCompanionImageMessage() {
-  return {
-    role: 'assistant',
-    type: 'image',
-    src: buildRandomCompanionImageUrl(),
-    prompt: '随机图片',
-    content: '',
-    source: 'boudoir-random',
-  };
 }
 
 function authHeaders() {
@@ -1004,7 +987,6 @@ async function sendMessage() {
 
   const requestHistory = [...state.messages, { role: 'user', content: prompt }];
   state.messages.push({ role: 'user', content: prompt });
-  state.messages.push(createRandomCompanionImageMessage());
   state.messages.push({ role: 'assistant', content: '' });
   const assistantIndex = state.messages.length - 1;
   ui.prompt.value = '';
