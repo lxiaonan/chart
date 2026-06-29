@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>模型实验台 | GitHub Pages</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260629-panel-image-tab" />
   </head>
   <body>
     <div id="appShell" class="app-shell" data-mode="connect" data-settings-open="false">
@@ -105,6 +105,11 @@
         </section>
 
         <section class="panel-block panel-actions" aria-label="聊天管理">
+          <nav class="mode-tabs" aria-label="功能切换">
+            <button id="chatMode" type="button" data-active="true">聊天</button>
+            <button id="imageMode" type="button">生图</button>
+          </nav>
+
           <div class="inline-actions">
             <button id="exportChat" class="ghost-button" type="button">导出聊天</button>
             <button id="clearChat" class="ghost-button" type="button">清空聊天</button>
@@ -176,10 +181,6 @@
           </div>
         </form>
 
-        <nav class="mode-tabs" aria-label="功能切换">
-          <button id="chatMode" type="button" data-active="true">聊天</button>
-          <button id="imageMode" type="button">生图</button>
-        </nav>
       </main>
     </div>
 
@@ -204,6 +205,6 @@
       </article>
     </template>
 
-    <script type="module" src="./app.js?v=20260629-chat-cleanup"></script>
+    <script type="module" src="./app.js?v=20260629-panel-image-tab"></script>
   </body>
 </html>

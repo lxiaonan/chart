@@ -1045,26 +1045,6 @@ input[type="range"] {
     display: none;
   }
 
-  .mode-tabs {
-    margin-top: 0;
-    padding: 6px 8px max(6px, env(safe-area-inset-bottom));
-    background: #f7f7f7;
-    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
-  }
-
-  .mode-tabs button {
-    min-height: 34px;
-    border-color: #d8d8d8;
-    background: #ffffff;
-    color: #555555;
-  }
-
-  .mode-tabs button[data-active="true"] {
-    border-color: #07c160;
-    background: #07c160;
-    color: #ffffff;
-  }
-
   .composer textarea {
     min-height: 36px;
     max-height: 96px;
